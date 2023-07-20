@@ -13,6 +13,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/CQRS-Muflone/Muflone.Transport.Azure.Saga</RepositoryUrl>
     <PackageTags>Broker, MS Azure, CQRS, Saga, Event Sourcing</PackageTags>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
   </PropertyGroup>
 
   <ItemGroup>
