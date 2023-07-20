@@ -4,6 +4,15 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Title>Mulfone Transport Azure Saga</Title>
+    <Version>6.0.0</Version>
+    <Authors>Alberto Acerbis - Alessandro Colla</Authors>
+    <Description>Muflone saga implementation for MS Azure</Description>
+    <PackageProjectUrl>https://github.com/CQRS-Muflone/Muflone.Transport.Azure.Saga</PackageProjectUrl>
+    <PackageIcon>Logo.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/CQRS-Muflone/Muflone.Transport.Azure.Saga</RepositoryUrl>
+    <PackageTags>Broker, MS Azure, CQRS, Saga, Event Sourcing</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +22,17 @@
 
   <ItemGroup>
     <Folder Include="Abstracts\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\..\Logo.png">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+    <None Include="..\..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>
