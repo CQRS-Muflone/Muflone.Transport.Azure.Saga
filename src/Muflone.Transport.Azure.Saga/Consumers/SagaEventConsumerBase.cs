@@ -5,10 +5,13 @@ using Muflone.Transport.Azure.Abstracts;
 using Muflone.Transport.Azure.Factories;
 using Muflone.Transport.Azure.Models;
 using System.Globalization;
+using Muflone.Saga;
+using Muflone.Transport.Azure.Saga.Abstracts;
 
 namespace Muflone.Transport.Azure.Saga.Consumers;
 
-public abstract class SagaEventConsumerBase<T> : IDomainEventConsumer<T>, IAsyncDisposable where T : class, IDomainEvent
+public abstract class SagaEventConsumerBase<T> : ISagaEventConsumer<T>, IAsyncDisposable
+	where T : Event
 {
 	public string TopicName { get; }
 
@@ -16,7 +19,7 @@ public abstract class SagaEventConsumerBase<T> : IDomainEventConsumer<T>, IAsync
 	private readonly Persistence.ISerializer _messageSerializer;
 	private readonly ILogger _logger;
 
-	protected abstract IEnumerable<IDomainEventHandlerAsync<T>> HandlersAsync { get; }
+	protected abstract ISagaEventHandlerAsync<T> HandlerAsync { get; }
 
 	protected SagaEventConsumerBase(AzureServiceBusConfiguration azureServiceBusConfiguration,
 		ILoggerFactory loggerFactory,
@@ -31,7 +34,10 @@ public abstract class SagaEventConsumerBase<T> : IDomainEventConsumer<T>, IAsync
 			throw new ArgumentNullException(nameof(azureServiceBusConfiguration.ClientId));
 
 		// Create Topic on Azure ServiceBus if missing
-		ServiceBusAdministrator.CreateTopicIfNotExistAsync(azureServiceBusConfiguration).GetAwaiter().GetResult();
+		azureServiceBusConfiguration = new AzureServiceBusConfiguration(azureServiceBusConfiguration.ConnectionString,
+			TopicName, azureServiceBusConfiguration.ClientId);
+		ServiceBusAdministrator
+			.CreateTopicIfNotExistAsync(azureServiceBusConfiguration).GetAwaiter().GetResult();
 
 		var serviceBusClient = new ServiceBusClient(azureServiceBusConfiguration.ConnectionString);
 		_processor = serviceBusClient.CreateProcessor(
@@ -57,15 +63,13 @@ public abstract class SagaEventConsumerBase<T> : IDomainEventConsumer<T>, IAsync
 			if (message == null)
 				throw new ArgumentNullException(nameof(message));
 
-			foreach (var handlerAsync in HandlersAsync)
-			{
-				await handlerAsync.HandleAsync((dynamic)message, cancellationToken);
-			}
+			await HandlerAsync.HandleAsync((dynamic)message);
 		}
 		catch (Exception ex)
 		{
 			_logger.LogError(ex,
-				$"An error occurred processing domainEvent {TopicName}. StackTrace: {ex.StackTrace} - Source: {ex.Source} - Message: {ex.Message}");
+				"An error occurred processing domainEvent {TopicName}. StackTrace: {ExStackTrace} - Source: {ExSource} - Message: {ExMessage}",
+				TopicName, ex.StackTrace, ex.Source, ex.Message);
 			throw;
 		}
 	}

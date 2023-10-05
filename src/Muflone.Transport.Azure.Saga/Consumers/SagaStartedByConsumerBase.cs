@@ -1,14 +1,16 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Logging;
 using Muflone.Messages.Commands;
-using Muflone.Transport.Azure.Abstracts;
 using Muflone.Transport.Azure.Factories;
 using Muflone.Transport.Azure.Models;
 using System.Globalization;
+using Muflone.Saga;
+using Muflone.Transport.Azure.Saga.Abstracts;
 
 namespace Muflone.Transport.Azure.Saga.Consumers;
 
-public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsyncDisposable where T : class, ICommand
+public abstract class SagaStartedByConsumerBase<TCommand> : ISagaStartedByConsumer<TCommand>, IAsyncDisposable
+	where TCommand : Command
 {
 	public string TopicName { get; }
 
@@ -16,13 +18,13 @@ public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsync
 	private readonly Persistence.ISerializer _messageSerializer;
 	private readonly ILogger _logger;
 
-	protected abstract ICommandHandlerAsync<T> HandlerAsync { get; }
+	protected abstract ISagaStartedByAsync<TCommand> HandlerAsync { get; }
 
 	protected SagaStartedByConsumerBase(AzureServiceBusConfiguration azureServiceBusConfiguration,
 		ILoggerFactory loggerFactory,
 		Persistence.ISerializer? messageSerializer = null)
 	{
-		TopicName = typeof(T).Name;
+		TopicName = typeof(TCommand).Name;
 
 		_logger = loggerFactory.CreateLogger(GetType()) ?? throw new ArgumentNullException(nameof(loggerFactory));
 
@@ -44,7 +46,7 @@ public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsync
 		_processor.ProcessErrorAsync += ProcessErrorAsync;
 	}
 
-	public Task ConsumeAsync(T message, CancellationToken cancellationToken = default)
+	public Task ConsumeAsync(TCommand message, CancellationToken cancellationToken = default)
 	{
 		if (message == null)
 			throw new ArgumentNullException(nameof(message));
@@ -59,13 +61,15 @@ public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsync
 			if (message == null)
 				throw new ArgumentNullException(nameof(message));
 
-			HandlerAsync.HandleAsync((dynamic)message, cancellationToken);
+			HandlerAsync.StartedByAsync((dynamic)message);
 
 			return Task.CompletedTask;
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, $"An error occurred processing command {typeof(T).Name}. StackTrace: {ex.StackTrace} - Source: {ex.Source} - Message: {ex.Message}");
+			_logger.LogError(ex,
+				"An error occurred processing command {Name}. StackTrace: {ExStackTrace} - Source: {ExSource} - Message: {ExMessage}",
+				typeof(T).Name, ex.StackTrace, ex.Source, ex.Message);
 			throw;
 		}
 	}
@@ -80,9 +84,9 @@ public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsync
 	{
 		try
 		{
-			_logger.LogInformation($"Received message '{args.Message.MessageId}'. Processing...");
+			_logger.LogInformation("Received message \'{MessageMessageId}\'. Processing...", args.Message.MessageId);
 
-			var message = await _messageSerializer.DeserializeAsync<T>(args.Message.Body.ToString());
+			var message = await _messageSerializer.DeserializeAsync<TCommand>(args.Message.Body.ToString());
 
 			await ConsumeAsync(message, args.CancellationToken);
 
@@ -90,7 +94,8 @@ public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsync
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, $"an error has occurred while processing message '{args.Message.MessageId}': {ex.Message}");
+			_logger.LogError(ex, "an error has occurred while processing message \'{MessageMessageId}\': {ExMessage}",
+				args.Message.MessageId, ex.Message);
 			if (args.Message.DeliveryCount > 3)
 				await args.DeadLetterMessageAsync(args.Message).ConfigureAwait(false);
 			else
@@ -100,7 +105,9 @@ public abstract class SagaStartedByConsumerBase<T> : ICommandConsumer<T>, IAsync
 
 	private Task ProcessErrorAsync(ProcessErrorEventArgs arg)
 	{
-		_logger.LogError(arg.Exception, $"An exception has occurred while processing message '{arg.FullyQualifiedNamespace}'");
+		_logger.LogError(arg.Exception,
+			"An exception has occurred while processing message \'{ArgFullyQualifiedNamespace}\'",
+			arg.FullyQualifiedNamespace);
 		return Task.CompletedTask;
 	}
 
