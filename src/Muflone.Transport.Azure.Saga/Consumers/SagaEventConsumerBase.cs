@@ -1,7 +1,6 @@
 ﻿using Azure.Messaging.ServiceBus;
 using Microsoft.Extensions.Logging;
 using Muflone.Messages.Events;
-using Muflone.Transport.Azure.Abstracts;
 using Muflone.Transport.Azure.Factories;
 using Muflone.Transport.Azure.Models;
 using System.Globalization;
@@ -13,7 +12,7 @@ namespace Muflone.Transport.Azure.Saga.Consumers;
 public abstract class SagaEventConsumerBase<T> : ISagaEventConsumer<T>, IAsyncDisposable
 	where T : Event
 {
-	public string TopicName { get; }
+	private string TopicName { get; }
 
 	private readonly ServiceBusProcessor _processor;
 	private readonly Persistence.ISerializer _messageSerializer;
@@ -35,7 +34,7 @@ public abstract class SagaEventConsumerBase<T> : ISagaEventConsumer<T>, IAsyncDi
 
 		// Create Topic on Azure ServiceBus if missing
 		azureServiceBusConfiguration = new AzureServiceBusConfiguration(azureServiceBusConfiguration.ConnectionString,
-			TopicName, azureServiceBusConfiguration.ClientId);
+			TopicName.ToLower(CultureInfo.InvariantCulture), azureServiceBusConfiguration.ClientId);
 		ServiceBusAdministrator
 			.CreateTopicIfNotExistAsync(azureServiceBusConfiguration).GetAwaiter().GetResult();
 
@@ -51,13 +50,22 @@ public abstract class SagaEventConsumerBase<T> : ISagaEventConsumer<T>, IAsyncDi
 		_processor.ProcessErrorAsync += ProcessErrorAsync;
 	}
 
-	public async Task StartAsync(CancellationToken cancellationToken = default) =>
+	public async Task StartAsync(CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
 		await _processor.StartProcessingAsync(cancellationToken).ConfigureAwait(false);
+	}
 
-	public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+	public Task StopAsync(CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		return Task.CompletedTask;
+	}
 
 	public async Task ConsumeAsync(T message, CancellationToken cancellationToken = default)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+		
 		try
 		{
 			if (message == null)
@@ -78,17 +86,18 @@ public abstract class SagaEventConsumerBase<T> : ISagaEventConsumer<T>, IAsyncDi
 	{
 		try
 		{
-			_logger.LogInformation($"Received message '{args.Message.MessageId}'. Processing...");
+			_logger.LogInformation("Received message \'{MessageMessageId}\'. Processing...", args.Message.MessageId);
 
 			var message = await _messageSerializer.DeserializeAsync<T>(args.Message.Body.ToString());
 
-			await ConsumeAsync(message, args.CancellationToken);
+			await ConsumeAsync(message!, args.CancellationToken);
 
 			await args.CompleteMessageAsync(args.Message).ConfigureAwait(false);
 		}
 		catch (Exception ex)
 		{
-			_logger.LogError(ex, $"an error has occurred while processing message '{args.Message.MessageId}': {ex.Message}");
+			_logger.LogError(ex, "an error has occurred while processing message \'{MessageMessageId}\': {ExMessage}",
+				args.Message.MessageId, ex.Message);
 			if (args.Message.DeliveryCount > 3)
 				await args.DeadLetterMessageAsync(args.Message).ConfigureAwait(false);
 			else
@@ -99,7 +108,8 @@ public abstract class SagaEventConsumerBase<T> : ISagaEventConsumer<T>, IAsyncDi
 	private Task ProcessErrorAsync(ProcessErrorEventArgs arg)
 	{
 		_logger.LogError(arg.Exception,
-			$"An exception has occurred while processing message '{arg.FullyQualifiedNamespace}'");
+			"An exception has occurred while processing message \'{ArgFullyQualifiedNamespace}\'",
+			arg.FullyQualifiedNamespace);
 		return Task.CompletedTask;
 	}
 

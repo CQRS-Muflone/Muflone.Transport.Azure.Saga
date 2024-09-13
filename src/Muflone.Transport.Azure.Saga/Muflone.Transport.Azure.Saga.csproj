@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net6.0</TargetFramework>
+    <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Title>Mulfone Transport Azure Saga</Title>
-    <Version>6.0.0</Version>
+    <Version>8.1.1</Version>
     <Authors>Alberto Acerbis - Alessandro Colla</Authors>
     <Description>Muflone saga implementation for MS Azure</Description>
     <PackageProjectUrl>https://github.com/CQRS-Muflone/Muflone.Transport.Azure.Saga</PackageProjectUrl>
@@ -14,12 +14,12 @@
     <RepositoryUrl>https://github.com/CQRS-Muflone/Muflone.Transport.Azure.Saga</RepositoryUrl>
     <PackageTags>Broker, MS Azure, CQRS, Saga, Event Sourcing</PackageTags>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <PackageVersion>6.1.0</PackageVersion>
+    <PackageVersion>8.1.1</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Muflone.Saga" Version="6.2.0" />
-    <PackageReference Include="Muflone.Transport.Azure" Version="6.1.4" />
+    <PackageReference Include="Muflone.Saga" Version="8.1.1" />
+    <PackageReference Include="Muflone.Transport.Azure" Version="8.1.1" />
   </ItemGroup>
 
   <ItemGroup>

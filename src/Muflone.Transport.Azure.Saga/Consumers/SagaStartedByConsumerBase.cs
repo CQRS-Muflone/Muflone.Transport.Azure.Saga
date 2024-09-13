@@ -56,10 +56,11 @@ public abstract class SagaStartedByConsumerBase<TCommand> : ISagaStartedByConsum
 
 	private Task ConsumeAsyncCore<T>(T message, CancellationToken cancellationToken)
 	{
+		cancellationToken.ThrowIfCancellationRequested();
+		
 		try
 		{
-			if (message == null)
-				throw new ArgumentNullException(nameof(message));
+			ArgumentNullException.ThrowIfNull(message);
 
 			HandlerAsync.StartedByAsync((dynamic)message);
 
@@ -74,11 +75,17 @@ public abstract class SagaStartedByConsumerBase<TCommand> : ISagaStartedByConsum
 		}
 	}
 
-	public async Task StartAsync(CancellationToken cancellationToken = default) =>
+	public async Task StartAsync(CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
 		await _processor.StartProcessingAsync(cancellationToken).ConfigureAwait(false);
+	}
 
-	public Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
-
+	public Task StopAsync(CancellationToken cancellationToken = default)
+	{
+		cancellationToken.ThrowIfCancellationRequested();
+		return _processor.StopProcessingAsync(cancellationToken);
+	}
 
 	private async Task AzureMessageHandler(ProcessMessageEventArgs args)
 	{
@@ -88,7 +95,7 @@ public abstract class SagaStartedByConsumerBase<TCommand> : ISagaStartedByConsum
 
 			var message = await _messageSerializer.DeserializeAsync<TCommand>(args.Message.Body.ToString());
 
-			await ConsumeAsync(message, args.CancellationToken);
+			await ConsumeAsync(message!, args.CancellationToken);
 
 			await args.CompleteMessageAsync(args.Message).ConfigureAwait(false);
 		}
